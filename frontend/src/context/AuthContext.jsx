@@ -1,3 +1,4 @@
+// context/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect } from "react";
 
 const AuthContext = createContext();
@@ -16,8 +17,6 @@ export const AuthProvider = ({ children }) => {
   const getToken = () => localStorage.getItem("token");
 
   // ✅ Load user (VALIDATE TOKEN)
-// In AuthContext.jsx, update the loadUser function to also store user in localStorage
-useEffect(() => {
   const loadUser = async () => {
     const token = getToken();
 
@@ -35,19 +34,17 @@ useEffect(() => {
 
       if (!res.ok) {
         localStorage.removeItem("token");
-        localStorage.removeItem("user"); // Clear stored user
+        localStorage.removeItem("user");
         setUser(null);
         setLoading(false);
         return;
       }
 
       const data = await res.json();
-      console.log("Loaded user data from /me:", data);
-      console.log("User role from /me:", data.role);
+      console.log("✅ User loaded from /me:", data);
       
-      // Store in localStorage for persistence
+      // Store user in localStorage
       localStorage.setItem("user", JSON.stringify(data));
-      
       setUser(data);
 
     } catch (error) {
@@ -60,8 +57,35 @@ useEffect(() => {
     setLoading(false);
   };
 
-  loadUser();
-}, []); 
+  // Load user on mount
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  // Listen for storage changes (for cross-tab sync and manual updates)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'user') {
+        if (e.newValue) {
+          try {
+            const userData = JSON.parse(e.newValue);
+            setUser(userData);
+          } catch (err) {
+            console.error('Error parsing user data:', err);
+          }
+        } else {
+          setUser(null);
+        }
+      }
+      
+      if (e.key === 'token' && !e.newValue) {
+        setUser(null);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // ✅ SIGNUP
   const signup = async (name, email, password) => {
@@ -71,7 +95,7 @@ useEffect(() => {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, password, verified: true })
       });
 
       const data = await res.json();
@@ -80,10 +104,11 @@ useEffect(() => {
         return { success: false, message: data.message };
       }
 
-      console.log("Signup response:", data); // Debug log
+      console.log("✅ Signup response:", data);
 
       // 🔥 Store token and user data
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       setUser(data.user);
       setShowAuthModal(false);
 
@@ -112,9 +137,10 @@ useEffect(() => {
         return { success: false, message: data.message };
       }
 
-      console.log("Login response:", data); // Debug log
+      console.log("✅ Login response:", data);
 
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       setUser(data.user);
       setShowAuthModal(false);
 
@@ -129,8 +155,14 @@ useEffect(() => {
   // ✅ LOGOUT
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
     setShowAuthModal(false);
+  };
+
+  // Force refresh user data
+  const refreshUser = async () => {
+    await loadUser();
   };
 
   const value = {
@@ -142,7 +174,8 @@ useEffect(() => {
     setAuthMode,
     signup,
     login,
-    logout
+    logout,
+    refreshUser
   };
 
   return (

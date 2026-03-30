@@ -1,17 +1,35 @@
+// models/User.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
-  name: String,
+  name: {
+    type: String,
+    required: true
+  },
   email: {
     type: String,
-    unique: true,
+    required: true,
+    unique: true
   },
-  password: String,
+  password: {
+    type: String,
+    required: true
+  },
   role: {
-  type: String,
-  enum: ["user", "admin"],
-  default: "user"
-},
+    type: String,
+    enum: ["user", "admin"],
+    default: "user"
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationCode: {
+    type: String
+  },
+  verificationCodeExpires: {
+    type: Date
+  }
 }, { timestamps: true });
 
 export default mongoose.model("User", userSchema);
